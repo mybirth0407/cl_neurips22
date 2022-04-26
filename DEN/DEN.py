@@ -34,12 +34,9 @@ class DEN(object):
             w = self.create_variable(
                 "layer%d" % (i + 1), "weight", [self.dims[i], self.dims[i + 1]]
             )
-            b = self.create_variable(
-                "layer%d" % (i + 1), "biases", [self.dims[i + 1]]
-            )
+            b = self.create_variable("layer%d" % (i + 1), "biases", [self.dims[i + 1]])
             self.params[w.name] = w
             self.params[b.name] = b
-
         self.cur_W, self.prev_W = dict(), dict()
 
     def get_params(self):
@@ -60,14 +57,10 @@ class DEN(object):
                 if ("layer%d" % self.n_layers in scope_name) and (
                     ("_%d" % self.T) in scope_name
                 ):
-                    w = tf.get_variable(
-                        scope_name, initializer=param, trainable=True
-                    )
+                    w = tf.get_variable(scope_name, initializer=param, trainable=True)
                     self.params[w.name] = w
                 elif "layer%d" % self.n_layers in scope_name:
-                    w = tf.get_variable(
-                        scope_name, initializer=param, trainable=False
-                    )
+                    w = tf.get_variable(scope_name, initializer=param, trainable=False)
                     self.params[w.name] = w
                 else:
                     pass
@@ -82,16 +75,12 @@ class DEN(object):
             scope_name = scope_name.split(":")[0]
             scope = scope_name.split("/")[0]
             name = scope_name.split("/")[1]
-            if (scope == "layer%d" % self.n_layers) and (
-                "_%d" % self.T
-            ) not in name:
+            if (scope == "layer%d" % self.n_layers) and ("_%d" % self.T) not in name:
                 trainable = False
             if scope in self.param_trained:
                 trainable = False
             # current task is trainable
-            w = tf.get_variable(
-                scope_name, initializer=param, trainable=trainable
-            )
+            w = tf.get_variable(scope_name, initializer=param, trainable=trainable)
             self.params[w.name] = w
 
     def create_variable(self, scope, name, shape, trainable=True):
@@ -198,9 +187,7 @@ class DEN(object):
             prev_dim = w.get_shape().as_list()[0]
             next_dim = w.get_shape().as_list()[1]
             # connect bottom to top
-            new_w = self.create_variable(
-                scope + "/new_fc", "bw", [prev_dim, ex_k]
-            )
+            new_w = self.create_variable(scope + "/new_fc", "bw", [prev_dim, ex_k])
             new_b = self.create_variable(scope + "/new_fc", "bb", [ex_k])
 
             expanded_w = tf.concat([w, new_w], 1)
@@ -215,15 +202,21 @@ class DEN(object):
             self.params[b.name] = expanded_b
             return expanded_w, expanded_b
 
-    def build_model(
-        self, task_id, prediction=False, splitting=False, expansion=None
-    ):
-        bottom = self.X
+    def build_model(self, task_id, prediction=False, splitting=False, expansion=None):
+        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])   # img 28x28x1 (black/white)
+        # L1 ImgIn shape=(?, 28, 28, 1)
+        self.W1 = tf.Variable(tf.random_normal([3, 3, 3, 6], stddev=0.01))
+        #    Conv     -> (?, 28, 28, 6)
+        self.L1 = tf.nn.conv2d(self.X_img, self.W1, strides=[1, 1, 1, 1], padding='SAME')
+        self.L1 = tf.layers.batch_normalization(self.L1, center=True, scale=True, training=True)
+        self.L1 = tf.nn.relu(self.L1)
+        self.conv = tf.reshape(self.L1, [-1, 28 * 28 * 6])
+
+        bottom = self.conv
+
         if splitting:
             for i in range(1, self.n_layers):
-                prev_w = np.copy(
-                    self.prev_W_split["layer%d" % i + "/weight:0"]
-                )
+                prev_w = np.copy(self.prev_W_split["layer%d" % i + "/weight:0"])
                 cur_w = np.copy(self.cur_W["layer%d" % i + "/weight:0"])
                 indices = self.unit_indices["layer%d" % i]
                 next_dim = prev_w.shape[1]
@@ -245,12 +238,12 @@ class DEN(object):
                         else:
                             bottom_p_prev_ary.append(cur_w[j, :])
                             bottom_c_prev_ary.append(cur_w[j, :])
-                    prev_w = np.array(
-                        bottom_p_prev_ary + bottom_p_new_ary
-                    ).astype(np.float32)
-                    cur_w = np.array(
-                        bottom_c_prev_ary + bottom_c_new_ary
-                    ).astype(np.float32)
+                    prev_w = np.array(bottom_p_prev_ary + bottom_p_new_ary).astype(
+                        np.float32
+                    )
+                    cur_w = np.array(bottom_c_prev_ary + bottom_c_new_ary).astype(
+                        np.float32
+                    )
 
                 prev_ary = []
                 new_ary = []
@@ -296,10 +289,14 @@ class DEN(object):
                 b = self.get_variable("layer%d" % i, "biases", False)
                 w = w[: stamp[i - 1], : stamp[i]]
                 b = b[: stamp[i]]
-                print(
-                    " [*] task %d, shape : %s" % (i, w.get_shape().as_list())
-                )
+                print(" [*] task %d, shape : %s" % (i, w.get_shape().as_list()))
 
+
+                # print(bottom)
+                # print('--------------------------------')
+                # print(w)
+                # print('--------------------------------')
+                # print(b)
                 bottom = tf.nn.relu(tf.matmul(bottom, w) + b)
 
             w = self.get_variable(
@@ -333,16 +330,25 @@ class DEN(object):
 
         self.yhat = tf.nn.sigmoid(self.y)
         self.loss = tf.reduce_mean(
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.y, labels=self.Y
-            )
+            tf.nn.sigmoid_cross_entropy_with_logits(logits=self.y, labels=self.Y)
         )
 
         if prediction:
             return
 
     def selective_learning(self, task_id, selected_params):
-        bottom = self.X
+        # bottom = self.conv_flatten
+        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])   # img 28x28x1 (black/white)
+        # L1 ImgIn shape=(?, 28, 28, 1)
+        self.W1 = tf.Variable(tf.random_normal([3, 3, 3, 6], stddev=0.01))
+        #    Conv     -> (?, 28, 28, 6)
+        self.L1 = tf.nn.conv2d(self.X_img, self.W1, strides=[1, 1, 1, 1], padding='SAME')
+        self.L1 = tf.layers.batch_normalization(self.L1, center=True, scale=True, training=True)
+        self.L1 = tf.nn.relu(self.L1)
+        self.conv = tf.reshape(self.L1, [-1, 28 * 28 * 6])
+        
+        bottom = self.conv
+
         for i in range(1, self.n_layers):
             with tf.variable_scope("layer%d" % i):
                 w = tf.get_variable(
@@ -372,14 +378,10 @@ class DEN(object):
         self.y = tf.matmul(bottom, w) + b
         self.yhat = tf.nn.sigmoid(self.y)
         self.loss = tf.reduce_mean(
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                logits=self.y, labels=self.Y
-            )
+            tf.nn.sigmoid_cross_entropy_with_logits(logits=self.y, labels=self.Y)
         )
 
-    def optimization(
-        self, prev_W, selective=False, splitting=False, expansion=None
-    ):
+    def optimization(self, prev_W, selective=False, splitting=False, expansion=None):
         if selective:
             all_var = [
                 var
@@ -425,9 +427,7 @@ class DEN(object):
         l1_op_list = []
         with tf.control_dependencies([apply_grads]):
             for var in l1_var:
-                th_t = tf.fill(
-                    tf.shape(var), tf.convert_to_tensor(self.l1_lambda)
-                )
+                th_t = tf.fill(tf.shape(var), tf.convert_to_tensor(self.l1_lambda))
                 zero_t = tf.zeros(tf.shape(var))
                 var_temp = var - (th_t * tf.sign(var))
                 l1_op = var.assign(
@@ -469,7 +469,14 @@ class DEN(object):
             0.95,  # Decay rate.
             staircase=True,
         )
-        self.X = tf.placeholder(tf.float32, [None, self.dims[0]])
+        self.X = tf.placeholder(tf.float32, [None, 784*3])
+        
+        # W4 = tf.get_variable("flatten", shape=[28 * 28 * 4, 28 * 28 * 3],
+        #                      initializer=tf.contrib.layers.xavier_initializer())
+        # b4 = tf.Variable(tf.random_normal([625]))
+        # L4 = tf.nn.relu(tf.matmul(L3_flat, W4) + b4)
+        # L4 = tf.nn.dropout(L4, keep_prob=keep_prob)
+
         self.Y = tf.placeholder(tf.float32, [None, self.n_classes])
 
     def add_task(self, task_id, data):
@@ -532,9 +539,7 @@ class DEN(object):
                         if np.count_nonzero(w[j, top_indices]) != 0 or i == 1:
                             all_indices["layer%d" % i].append(j)
 
-                    sub_weight = w[
-                        np.ix_(all_indices["layer%d" % i], top_indices)
-                    ]
+                    sub_weight = w[np.ix_(all_indices["layer%d" % i], top_indices)]
                     sub_biases = b[all_indices["layer%d" % (i + 1)]]
                     selected_params["layer%d/weight:0" % i] = sub_weight
                     selected_params["layer%d/biases:0" % i] = sub_biases
@@ -571,9 +576,9 @@ class DEN(object):
                         np.ix_(all_indices["layer%d" % i], [0])
                     ] = selected_params["layer%d/weight_%d:0" % (i, task_id)]
                     params["layer%d/weight_%d:0" % (i, task_id)] = temp_weight
-                    params[
+                    params["layer%d/biases_%d:0" % (i, task_id)] = selected_params[
                         "layer%d/biases_%d:0" % (i, task_id)
-                    ] = selected_params["layer%d/biases_%d:0" % (i, task_id)]
+                    ]
                 else:
                     temp_weight = params["layer%d/weight:0" % i]
                     temp_biases = params["layer%d/biases:0" % i]
@@ -583,9 +588,9 @@ class DEN(object):
                             all_indices["layer%d" % (i + 1)],
                         )
                     ] = selected_params["layer%d/weight:0" % i]
-                    temp_biases[
-                        all_indices["layer%d" % (i + 1)]
-                    ] = selected_params["layer%d/biases:0" % i]
+                    temp_biases[all_indices["layer%d" % (i + 1)]] = selected_params[
+                        "layer%d/biases:0" % i
+                    ]
                     params["layer%d/weight:0" % i] = temp_weight
                     params["layer%d/biases:0" % i] = temp_biases
 
@@ -611,9 +616,7 @@ class DEN(object):
                     "Train",
                     print_pred=False,
                 )
-                val_preds = self.sess.run(
-                    self.yhat, feed_dict={self.X: self.valX}
-                )
+                val_preds = self.sess.run(self.yhat, feed_dict={self.X: self.valX})
                 val_perf = self.get_performance(val_preds, self.valY)
 
                 # delete useless params adding by addition.
@@ -629,9 +632,7 @@ class DEN(object):
                     ):
                         if np.count_nonzero(prev_layer_weight[:, j]) == 0:
                             useless.append(j)
-                    cur_layer_weight = np.delete(
-                        prev_layer_weight, useless, axis=1
-                    )
+                    cur_layer_weight = np.delete(prev_layer_weight, useless, axis=1)
                     cur_layer_biases = np.delete(prev_layer_biases, useless)
                     params["layer%d/weight:0" % i] = cur_layer_weight
                     params["layer%d/biases:0" % i] = cur_layer_biases
@@ -648,12 +649,8 @@ class DEN(object):
                                 "layer%d/weight_%d:0" % (i + 1, t)
                             ] = cur_layer_weight
                     else:
-                        prev_layer_weight = params[
-                            "layer%d/weight:0" % (i + 1)
-                        ]
-                        cur_layer_weight = np.delete(
-                            prev_layer_weight, useless, axis=0
-                        )
+                        prev_layer_weight = params["layer%d/weight:0" % (i + 1)]
+                        cur_layer_weight = np.delete(prev_layer_weight, useless, axis=0)
                         params["layer%d/weight:0" % (i + 1)] = cur_layer_weight
 
                     self.expansion_layer[i - 1] = self.ex_k - len(useless)
@@ -710,9 +707,7 @@ class DEN(object):
                 repeated, c_loss = self.run_epoch(
                     self.opt, self.loss, trainX, trainY, "Train"
                 )
-                val_preds = self.sess.run(
-                    self.yhat, feed_dict={self.X: self.valX}
-                )
+                val_preds = self.sess.run(self.yhat, feed_dict={self.X: self.valX})
                 val_perf = self.get_performance(val_preds, self.valY)
                 print(
                     "   [*] split, loss: %.4f, nn_perf: %.4f(valid) repeated: %d"
@@ -818,7 +813,7 @@ class DEN(object):
         return np.mean(perf_list)
 
     def predict_perform(self, task_id, X, Y, task_name=None):
-        self.X = tf.placeholder(tf.float32, [None, self.dims[0]])
+        self.X = tf.placeholder(tf.float32, [None, 784 * 3])
         self.Y = tf.placeholder(tf.float32, [None, self.n_classes])
         self.build_model(task_id, prediction=True)
         self.sess.run(tf.global_variables_initializer())
@@ -829,26 +824,7 @@ class DEN(object):
         if task_name == None:
             task_name = task_id
 
-        print(
-            " [*] Evaluation, Task:%s, test_acc: %.4f"
-            % (str(task_name), test_perf)
-        )
-        return test_perf
-
-    def predict_perform2(self, task_id, X, Y, task_name=None):
-        self.X = tf.placeholder(tf.float32, [None, self.dims[0]])
-        self.Y = tf.placeholder(tf.float32, [None, self.n_classes])
-
-        test_preds = self.sess.run(self.yhat, feed_dict={self.X: X})
-        test_perf = self.get_performance(test_preds, Y)
-
-        if task_name == None:
-            task_name = task_id
-
-        print(
-            " [*] Evaluation, Task:%s, test_acc: %.4f"
-            % (str(task_name), test_perf)
-        )
+        print(" [*] Evaluation, Task:%s, test_acc: %.4f" % (str(task_name), test_perf))
         return test_perf
 
     def prediction(self, X):

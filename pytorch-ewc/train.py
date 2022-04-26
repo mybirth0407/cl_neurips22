@@ -2,7 +2,7 @@
 # @Author: Yedarm Seong
 # @Date:   2022-04-05 16:20:48
 # @Last Modified by:   Yedarm Seong
-# @Last Modified time: 2022-04-16 04:06:39
+# @Last Modified time: 2022-04-24 16:07:01
 
 
 import torch
@@ -11,6 +11,7 @@ from torch import nn
 from torch.autograd import Variable
 import utils
 import visual
+import os
 
 
 def train(
@@ -19,6 +20,7 @@ def train(
     dic_val_dl,  # dict of dataloader
     unbiased_te_dl,  # dataloader
     wandb_writer,
+    save_dir='./exps',
     epochs_per_task=20,
     batch_size=32,
     consolidate=True,
@@ -33,6 +35,8 @@ def train(
 
     # set the model's mode to training mode.
     model.train()
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     for i in range(1, 11):  # task number
         print(f"{i}th task")
@@ -44,7 +48,8 @@ def train(
             loss_sum = 0.0
             total_num_train = 0
             for images, labels in train_loader:
-                images = images.view(images.shape[0], -1)
+                # if mlp
+                # images = images.view(images.shape[0], -1)
                 images = Variable(images.cuda()) if cuda else Variable(images)
                 labels = Variable(labels.cuda()) if cuda else Variable(labels)
                 bsize = images.shape[0]
@@ -96,3 +101,5 @@ def train(
         print(f"accuracy of current task {accuracy_current_task}")
         logs["valid/task_acc"] = accuracy_current_task
         wandb_writer.log(logs)
+
+        torch.save(model.state_dict(), f'{save_dir}/task_{i}.pth')

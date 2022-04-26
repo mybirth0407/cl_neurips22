@@ -11,12 +11,12 @@ np.random.seed(1004)
 flags = tf.app.flags
 flags.DEFINE_integer("max_iter", 4300, "Epoch to train")
 flags.DEFINE_float("lr", 0.001, "Learing rate(init) for train")
-flags.DEFINE_integer("batch_size", 64, "The size of batch for 1 iteration")
+flags.DEFINE_integer("batch_size", 32, "The size of batch for 1 iteration")
 flags.DEFINE_string(
     "checkpoint_dir", "checkpoints", "Directory path to save the checkpoints"
 )
 flags.DEFINE_list(
-    "dims", [784 * 3, 312, 128, 10], "Dimensions about layers including output"
+    "dims", [784 * 6, 512, 128, 10], "Dimensions about layers including output"
 )
 flags.DEFINE_integer("n_classes", 10, "The number of classes at each task")
 flags.DEFINE_float("l1_lambda", 0.00001, "Sparsity for L1")
@@ -30,7 +30,6 @@ flags.DEFINE_float("loss_thr", 0.01, "Threshold of dynamic expansion")
 flags.DEFINE_float("spl_thr", 0.05, "Threshold of split and duplication")
 
 flags.DEFINE_string("task_1", "BG", "fg or bg")
-flags.DEFINE_string("task_2", "BG", "fg or bg")
 flags.DEFINE_string("test_db", "BG", "fg or bg")
 flags.DEFINE_float("biased_r1", 0.0, "biased ratio")
 
@@ -62,9 +61,7 @@ part_val = int(10000 / num_step)
 
 for i in range(1, 11):
     dic_tr_indices[i] = indices[
-        (i - 1) * part_tr
-        + (i - 1) * part_val : i * part_tr
-        + (i - 1) * part_val
+        (i - 1) * part_tr + (i - 1) * part_val : i * part_tr + (i - 1) * part_val
     ]
     dic_val_indices[i] = indices[
         i * part_tr + (i - 1) * part_val : i * part_tr + i * part_val
@@ -163,12 +160,12 @@ for t in range(FLAGS.n_classes):
     )
 
     model.sess = tf.Session()
-    print("\n\n\tTASK %d TRAINING\n" % (t+1))
+    print("\n\n\tTASK %d TRAINING\n" % (t + 1))
 
-    model.T = model.T+1
-    model.task_indices.append(t+1)
+    model.T = model.T + 1
+    model.task_indices.append(t + 1)
     model.load_params(params, time=1)
-    perf, sparsity, expansion = model.add_task(t+1, data)
+    perf, sparsity, expansion = model.add_task(t + 1, data)
 
     params = model.get_params()
     model.destroy_graph()
@@ -182,7 +179,7 @@ for t in range(FLAGS.n_classes):
     #     print(j, t)
     #     temp_perf = model.predict_perform(j+1, testX, testY)
     #     temp_perfs.append(temp_perf)
-    accuracy_unbiased = model.predict_perform(t+1, testX, testY)
+    accuracy_unbiased = model.predict_perform(t + 1, testX, testY)
 
     # unbiased 에 대한 acc
     # avg_perf.append(sum(temp_perfs) / float(t+1))
@@ -192,10 +189,10 @@ for t in range(FLAGS.n_classes):
     model.destroy_graph()
     model.sess.close()
 
-    if t+1 > 1:
+    if t + 1 > 1:
         model.sess = tf.Session()
         model.load_params(params)
-        accuracy_prev_task = model.predict_perform(t+1, valXs[t-1], valYs[t-1])
+        accuracy_prev_task = model.predict_perform(t + 1, valXs[t - 1], valYs[t - 1])
         print(f"accuracy of prev task {accuracy_prev_task}")
         logs["valid/task_pre_acc_after"] = accuracy_prev_task
         model.destroy_graph()
@@ -203,9 +200,13 @@ for t in range(FLAGS.n_classes):
 
     model.sess = tf.Session()
     model.load_params(params)
-    accuracy_current_task = model.predict_perform(t+1, valXs[t], valYs[t])
+    accuracy_current_task = model.predict_perform(t + 1, valXs[t], valYs[t])
     print(f"accuracy of current task {accuracy_current_task}")
     logs["valid/task_acc"] = accuracy_current_task
+
+    saver = tf.train.Saver()
+    saver.save(model.sess, f"./exps/task_{t}")
+
     model.destroy_graph()
     model.sess.close()
 

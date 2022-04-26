@@ -66,7 +66,8 @@ def validate(model, optimizer, criteriton, data_loader, cuda=False, verbose=True
     total_loss = 0.0
 
     for images, labels in data_loader:
-        images = images.view(images.shape[0], -1)
+        # if mlp
+        # images = images.view(images.shape[0], -1)
         images = Variable(images.cuda()) if cuda else Variable(images)
         labels = Variable(labels.cuda()) if cuda else Variable(labels)
         batch_size = images.shape[0]
