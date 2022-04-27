@@ -205,7 +205,7 @@ for t in range(FLAGS.n_classes):
     logs["valid/task_acc"] = accuracy_current_task
 
     saver = tf.train.Saver()
-    saver.save(model.sess, f"./exps/task_{t}")
+    saver.save(model.sess, f"./exps/task_{t+1}")
 
     model.destroy_graph()
     model.sess.close()

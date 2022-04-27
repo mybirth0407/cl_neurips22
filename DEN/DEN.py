@@ -203,12 +203,16 @@ class DEN(object):
             return expanded_w, expanded_b
 
     def build_model(self, task_id, prediction=False, splitting=False, expansion=None):
-        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])   # img 28x28x1 (black/white)
+        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])  # img 28x28x1 (black/white)
         # L1 ImgIn shape=(?, 28, 28, 1)
         self.W1 = tf.Variable(tf.random_normal([3, 3, 3, 6], stddev=0.01))
         #    Conv     -> (?, 28, 28, 6)
-        self.L1 = tf.nn.conv2d(self.X_img, self.W1, strides=[1, 1, 1, 1], padding='SAME')
-        self.L1 = tf.layers.batch_normalization(self.L1, center=True, scale=True, training=True)
+        self.L1 = tf.nn.conv2d(
+            self.X_img, self.W1, strides=[1, 1, 1, 1], padding="SAME"
+        )
+        self.L1 = tf.layers.batch_normalization(
+            self.L1, center=True, scale=True, training=True
+        )
         self.L1 = tf.nn.relu(self.L1)
         self.conv = tf.reshape(self.L1, [-1, 28 * 28 * 6])
 
@@ -291,7 +295,6 @@ class DEN(object):
                 b = b[: stamp[i]]
                 print(" [*] task %d, shape : %s" % (i, w.get_shape().as_list()))
 
-
                 # print(bottom)
                 # print('--------------------------------')
                 # print(w)
@@ -338,15 +341,19 @@ class DEN(object):
 
     def selective_learning(self, task_id, selected_params):
         # bottom = self.conv_flatten
-        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])   # img 28x28x1 (black/white)
+        self.X_img = tf.reshape(self.X, [-1, 28, 28, 3])  # img 28x28x1 (black/white)
         # L1 ImgIn shape=(?, 28, 28, 1)
         self.W1 = tf.Variable(tf.random_normal([3, 3, 3, 6], stddev=0.01))
         #    Conv     -> (?, 28, 28, 6)
-        self.L1 = tf.nn.conv2d(self.X_img, self.W1, strides=[1, 1, 1, 1], padding='SAME')
-        self.L1 = tf.layers.batch_normalization(self.L1, center=True, scale=True, training=True)
+        self.L1 = tf.nn.conv2d(
+            self.X_img, self.W1, strides=[1, 1, 1, 1], padding="SAME"
+        )
+        self.L1 = tf.layers.batch_normalization(
+            self.L1, center=True, scale=True, training=True
+        )
         self.L1 = tf.nn.relu(self.L1)
         self.conv = tf.reshape(self.L1, [-1, 28 * 28 * 6])
-        
+
         bottom = self.conv
 
         for i in range(1, self.n_layers):
@@ -469,8 +476,8 @@ class DEN(object):
             0.95,  # Decay rate.
             staircase=True,
         )
-        self.X = tf.placeholder(tf.float32, [None, 784*3])
-        
+        self.X = tf.placeholder(tf.float32, [None, 784 * 3])
+
         # W4 = tf.get_variable("flatten", shape=[28 * 28 * 4, 28 * 28 * 3],
         #                      initializer=tf.contrib.layers.xavier_initializer())
         # b4 = tf.Variable(tf.random_normal([625]))
